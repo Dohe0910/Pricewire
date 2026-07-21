@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Pricewire price bot — Gemini edition.
+Pricewire price bot -- Gemini edition (google-genai SDK).
 Runs on a GitHub Actions schedule (free). Uses Gemini's free-tier API with
 Google Search grounding to re-check laptop prices, most-stale-first, and
 saves partial progress if it runs out of quota mid-run.
@@ -14,19 +14,16 @@ import sys
 import time
 from datetime import date
 
-import google.generativeai as genai
-from google.generativeai.types import Tool, GoogleSearchRetrieval
+from google import genai
+from google.genai import types
 
 HTML_PATH = "pricewire.html"
 START_TAG = '<script id="price-data" type="application/json">'
 END_TAG = "</script>"
 
-# Free tier is limited (roughly 15 requests/minute, ~1500/day depending on
-# model — check https://ai.google.dev/pricing for current numbers). We cap
-# how many laptops we touch per run so we never blow through the daily quota
-# in one go. Remaining laptops get picked up by the next scheduled run.
 MAX_LAPTOPS_PER_RUN = 60
-SECONDS_BETWEEN_CALLS = 4  # stay comfortably under free-tier rate limits
+SECONDS_BETWEEN_CALLS = 5
+MODEL = "gemini-2.5-flash"
 
 TODAY = date.today().strftime("%B %-d, %Y") if os.name != "nt" else date.today().strftime("%B %d, %Y")
 
@@ -50,38 +47,44 @@ def save_data(html, start, end, data):
 
 def pick_stale_laptops(laptops, limit):
     def sort_key(l):
-        return l.get("lastChecked", "0000-00-00")  # never-checked sorts first
+        return l.get("lastChecked", "0000-00-00")
     ordered = sorted(laptops, key=sort_key)
     return ordered[:limit]
 
 
 PROMPT_TEMPLATE = """You are checking the current US price for exactly one laptop, using
-Google Search grounding. Laptop: "{name}" (spec hint: {specs}).
+Google Search. Laptop: "{name}" (spec hint: {specs}).
 
 Search reputable US retailers (Amazon, Best Buy, B&H, Newegg, Walmart, Costco,
 Micro Center, Target, Adorama, or the manufacturer's own store). Find the
 current price for this exact configuration if possible.
 
-Respond with ONLY a JSON object, no other text, in this exact shape:
+Respond with ONLY a JSON object, no other text, no markdown fences, in this exact shape:
 {{
   "found": true or false,
-  "retailers": [{{"name": "...", "price": "$...", "url": "..."}}, ...up to 3, best deal first],
+  "retailers": [{{"name": "...", "price": "$...", "url": "..."}}],
   "note": "one short sentence, e.g. mentioning a sale or all-time low, or empty string",
   "why": "one short sentence on why this is/isn't the best pick"
 }}
-If you can't find a confident current price, set "found": false and leave the
-other fields as empty defaults. Never invent a price or a URL.
+Include up to 3 retailers, best deal first. If you can't find a confident current
+price, set "found": false and leave the other fields as empty defaults. Never
+invent a price or a URL.
 """
 
 
-def query_gemini(model, laptop):
+def query_gemini(client, laptop):
     name = laptop.get("keys", ["unknown"])[0] if laptop.get("keys") else laptop.get("name", "unknown laptop")
     specs = laptop.get("specs", "")
     prompt = PROMPT_TEMPLATE.format(name=name, specs=specs)
     try:
-        resp = model.generate_content(prompt)
-        text = resp.text.strip()
-        # Strip markdown code fences if Gemini added them despite instructions
+        grounding_tool = types.Tool(google_search=types.GoogleSearch())
+        config = types.GenerateContentConfig(tools=[grounding_tool])
+        resp = client.models.generate_content(
+            model=MODEL,
+            contents=prompt,
+            config=config,
+        )
+        text = (resp.text or "").strip()
         text = re.sub(r"^```(json)?|```$", "", text.strip(), flags=re.MULTILINE).strip()
         return json.loads(text)
     except Exception as e:
@@ -95,9 +98,7 @@ def main():
         print("GEMINI_API_KEY not set", file=sys.stderr)
         sys.exit(1)
 
-    genai.configure(api_key=api_key)
-    search_tool = Tool(google_search_retrieval=GoogleSearchRetrieval())
-    model = genai.GenerativeModel("gemini-2.5-flash", tools=[search_tool])
+    client = genai.Client(api_key=api_key)
 
     html, start, end, data = load_data()
     laptops = data["laptops"]
@@ -111,7 +112,7 @@ def main():
             continue
         name = laptop.get("keys", ["?"])[0] if laptop.get("keys") else "?"
         print(f"Checking: {name}")
-        result = query_gemini(model, laptop)
+        result = query_gemini(client, laptop)
         checked += 1
 
         if result and result.get("found") and result.get("retailers"):
@@ -125,21 +126,17 @@ def main():
             laptop["lastChecked"] = date.today().isoformat()
             changed += 1
         else:
-            # Couldn't confirm this run — leave price as-is, but still stamp
-            # lastChecked so it doesn't get retried every single run in a loop.
             laptop["lastChecked"] = date.today().isoformat()
 
-        # Save progress after EVERY laptop, so a crash or quota cutoff never
-        # loses completed work.
         data["asOf"] = TODAY
         save_data(html, start, end, data)
-        html, start, end, data = load_data()  # reload offsets since file length changed
+        html, start, end, data = load_data()
 
         time.sleep(SECONDS_BETWEEN_CALLS)
 
     remaining = len(laptops) - len([l for l in laptops if l.get("lastChecked") == date.today().isoformat()])
     print(f"\nDone. Checked {checked} laptops, updated {changed} with new data.")
-    print(f"~{remaining} laptops still due for a check — next run picks up where this left off.")
+    print(f"~{remaining} laptops still due for a check -- next run picks up where this left off.")
 
 
 if __name__ == "__main__":
