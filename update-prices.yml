@@ -4,7 +4,7 @@ on:
   schedule:
     # 10:00 UTC on the 1st and 15th of each month — an every-2-weeks-ish
     # cadence (GitHub Actions cron has no native "biweekly" option).
-    - cron: '0 10 1,15 * *'
+    - cron: '0 10 * * 0'
   workflow_dispatch: {}  # lets you click "Run workflow" manually to test
 
 permissions:
