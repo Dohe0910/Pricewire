@@ -1,0 +1,39 @@
+name: Update Pricewire prices
+
+on:
+  schedule:
+    # 10:00 UTC on the 1st and 15th of each month — an every-2-weeks-ish
+    # cadence (GitHub Actions cron has no native "biweekly" option).
+    - cron: '0 10 1,15 * *'
+  workflow_dispatch: {}  # lets you click "Run workflow" manually to test
+
+permissions:
+  contents: write  # needed so the job can commit the updated file back
+
+jobs:
+  update-prices:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install google-generativeai
+
+      - name: Run price bot
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python update_prices.py
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "pricewire-bot"
+          git config user.email "actions@github.com"
+          git add pricewire.html
+          git diff --cached --quiet && echo "No changes to commit" || git commit -m "Automated price check $(date +'%Y-%m-%d')"
+          git push
