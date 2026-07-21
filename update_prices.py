@@ -21,7 +21,7 @@ HTML_PATH = "pricewire.html"
 START_TAG = '<script id="price-data" type="application/json">'
 END_TAG = "</script>"
 
-MAX_LAPTOPS_PER_RUN = 60
+MAX_LAPTOPS_PER_RUN = 150
 SECONDS_BETWEEN_CALLS = 5
 MODEL = "gemini-2.5-flash"
 
