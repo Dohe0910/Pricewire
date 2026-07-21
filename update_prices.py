@@ -55,9 +55,11 @@ def pick_stale_laptops(laptops, limit):
 PROMPT_TEMPLATE = """You are checking the current US price for exactly one laptop, using
 Google Search. Laptop: "{name}" (spec hint: {specs}).
 
-Search reputable US retailers (Amazon, Best Buy, B&H, Newegg, Walmart, Costco,
-Micro Center, Target, Adorama, or the manufacturer's own store). Find the
-current price for this exact configuration if possible.
+Search reputable US retailers. Check as many of these as are relevant:
+Amazon, Best Buy, B&H Photo, Newegg, Walmart, Costco, Micro Center, Target,
+Adorama, Sam's Club, Staples, Office Depot, Dell.com, HP.com, Lenovo.com,
+ASUS Store, Acer Store, Razer.com, Framework.com, Antonline, and Woot. Find the
+.
 
 Respond with ONLY a JSON object, no other text, no markdown fences, in this exact shape:
 {{
