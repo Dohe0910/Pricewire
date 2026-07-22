@@ -15070,6 +15070,20 @@ document.getElementById('btn-us').onclick = () => setRegion('us');
 document.getElementById('btn-za').onclick = () => setRegion('za');
 
 document.getElementById('goBtn').onclick = () => search();
+  document.getElementById('resetBtn').onclick = () => {
+  document.getElementById('q').value = '';
+  document.getElementById('results').innerHTML = '';
+  chips.innerHTML = '';
+  DATA.laptops.slice().sort(() => Math.random() - 0.5).slice(0, 4).forEach(l => {
+    const b = document.createElement('button');
+    b.className = 'chip'; b.textContent = l.name;
+    b.onclick = () => search(l.name);
+    chips.appendChild(b);
+  });
+  document.getElementById('q').focus();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
 document.getElementById('q').addEventListener('keydown', e => { if (e.key === 'Enter') search(); });
 </script>
 </body>
