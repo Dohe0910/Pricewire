@@ -14904,7 +14904,7 @@ document.getElementById('asof').textContent = DATA.asOf;
 // ticker from live data (cap at 16 for smooth scrolling with a big catalog)
 const tickerItems = DATA.laptops.slice(0, 16).map(l => {
   const best = l.retailers[l.bestIndex || 0];
-  return `<span class="tick"><span class="dot"></span>${l.name.replace(/"/g,'&quot;')} ↓ <span class="p">${best.price}</span> at ${best.name}</span>`;
+  return `<span class="tick"><span class="dot"></span>${l.name.replace(/"/g,'&quot;')}  <span class="p">${best.price}</span> at ${best.name}</span>`;
 });
 document.getElementById('ticker').innerHTML = [...tickerItems, ...tickerItems].join('');
 
